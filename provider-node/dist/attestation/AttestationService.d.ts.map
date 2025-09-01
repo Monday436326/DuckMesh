@@ -1,0 +1,1 @@
+{"version":3,"file":"AttestationService.d.ts","sourceRoot":"","sources":["../../src/attestation/AttestationService.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,eAAe,EAAE,OAAO,EAAE,MAAM,UAAU,CAAC;AAGpD,qBAAa,kBAAkB;IAC7B,OAAO,CAAC,UAAU,CAAS;;IAOrB,mBAAmB,CAAC,MAAM,EAAE,eAAe,EAAE,IAAI,EAAE,OAAO,GAAG,OAAO,CAAC,MAAM,CAAC;IAsBlF,OAAO,CAAC,UAAU;IAQlB,OAAO,CAAC,WAAW;CAGpB"}
