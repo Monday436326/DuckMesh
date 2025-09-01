@@ -1,0 +1,130 @@
+### coordinator/serverless.yml
+
+service: duckmesh-coordinator-v2
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  environment:
+    RPC_URL: ${env:RPC_URL, 'https://eth-mainnet.g.alchemy.com/v2/demo'}
+    COORDINATOR_PRIVATE_KEY: ${env:COORDINATOR_PRIVATE_KEY, '0x0000000000000000000000000000000000000000000000000000000000000000'}
+    JOB_MARKET_ADDRESS: ${env:JOB_MARKET_ADDRESS, '0x0000000000000000000000000000000000000000'}
+    PROVIDER_REGISTRY_ADDRESS: ${env:PROVIDER_REGISTRY_ADDRESS, '0x0000000000000000000000000000000000000000'}
+    # Dynamic resource names based on service and stage
+    S3_BUCKET: ${self:service}-storage-${self:provider.stage}
+    DYNAMODB_TABLE: ${self:service}-results-${self:provider.stage}
+    COORDINATOR_API_KEY: ${env:COORDINATOR_API_KEY, 'default-api-key-change-in-production'}
+    # Note: AWS_REGION is automatically available as a Lambda environment variable
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+        - s3:PutObject
+        - s3:DeleteObject
+      Resource: 
+        - "arn:aws:s3:::${self:service}-storage-${self:provider.stage}"
+        - "arn:aws:s3:::${self:service}-storage-${self:provider.stage}/*"
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:PutItem
+        - dynamodb:GetItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: 
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:service}-results-${self:provider.stage}"
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:service}-results-${self:provider.stage}/index/*"
+    - Effect: Allow
+      Action:
+        - bedrock:InvokeModel
+        - bedrock:ListModels
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+      Resource: "*"
+
+functions:
+  assignJob:
+    handler: src/handlers/jobAssignment.assignJob
+    events:
+      - http:
+          path: /assign
+          method: post
+          cors: true
+    timeout: 30
+    
+  collectResults:
+    handler: src/handlers/resultCollection.collectResults
+    events:
+      - http:
+          path: /collect
+          method: post
+          cors: true
+    timeout: 30
+    
+  healthCheck:
+    handler: src/handlers/health.check
+    events:
+      - http:
+          path: /health
+          method: get
+          cors: true
+
+resources:
+  Resources:
+    # S3 Bucket for storing job specs and results
+    StorageBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-storage-${self:provider.stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        VersioningConfiguration:
+          Status: Enabled
+        
+    # DynamoDB Table for job metadata and results
+    ResultsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-results-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+  Outputs:
+    StorageBucketName:
+      Description: S3 Bucket for storing job data
+      Value: !Ref StorageBucket
+      Export:
+        Name: ${self:service}-storage-bucket-${self:provider.stage}
+        
+    ResultsTableName:
+      Description: DynamoDB table for results
+      Value: !Ref ResultsTable
+      Export:
+        Name: ${self:service}-results-table-${self:provider.stage}
+        
+
+
+plugins:
+  - serverless-typescript
