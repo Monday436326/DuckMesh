@@ -82,7 +82,7 @@ serverless deploy
 
 2. Deploy smart contracts:
 ```bash
-cd contracts
+cd duckmesh-contracts
 npm install
 npx hardhat deploy --network duckchain
 ```
